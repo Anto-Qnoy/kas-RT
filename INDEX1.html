@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kas Cluster Eternity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js untuk Grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow: hidden; }
+        
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-800 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="home" class="w-5 h-5 text-blue-300"></i>
+                <span class="text-lg font-bold tracking-tight">Cluster Eternity</span>
+            </div>
+            <button onclick="toggleLogin()" id="loginBtn" class="flex items-center space-x-1 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition text-xs border border-white/20">
+                <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                <span id="loginBtnText">Login Admin</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto p-3 md:p-6 space-y-4">
+        
+        <!-- Pesan Sambutan -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i data-lucide="info" class="h-5 w-5 text-blue-500"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-xs text-blue-700 font-medium">
+                        Portal Transparansi Kas Cluster Eternity. Data diperbarui secara realtime oleh pengurus.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Admin -->
+        <div id="adminBadge" class="hidden flex items-center justify-center bg-green-500/10 border border-green-500/30 text-green-700 p-2 rounded-xl text-xs font-bold animate-pulse">
+            <i data-lucide="shield-check" class="w-4 h-4 mr-2"></i> Mode Admin Aktif
+        </div>
+
+        <!-- Saldo & Grafik Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Ringkasan Angka -->
+            <div class="lg:col-span-1 space-y-3">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total Saldo</p>
+                        <h2 id="totalSaldo" class="text-xl font-bold text-blue-700">Rp 0</h2>
+                    </div>
+                    <div class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="wallet" class="w-5 h-5"></i></div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Pemasukan (D)</p>
+                        <h2 id="totalDebit" class="text-xl font-bold text-emerald-600">Rp 0</h2>
+                    </div>
+                    <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Pengeluaran (K)</p>
+                        <h2 id="totalKredit" class="text-xl font-bold text-rose-600">Rp 0</h2>
+                    </div>
+                    <div class="p-2 bg-rose-50 text-rose-600 rounded-lg"><i data-lucide="trending-down" class="w-5 h-5"></i></div>
+                </div>
+            </div>
+
+            <!-- Grafik Tren 3 Bulan -->
+            <div class="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 mr-2 text-blue-600"></i>
+                        Tren Keuangan (3 Bulan Terakhir)
+                    </h3>
+                </div>
+                <div class="relative h-[180px] w-full">
+                    <canvas id="kasChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Rekening -->
+        <div class="bg-gradient-to-br from-blue-700 to-indigo-900 p-5 rounded-2xl text-white shadow-md relative overflow-hidden">
+            <div class="relative z-10 space-y-3">
+                <div class="flex items-center space-x-2 opacity-80 uppercase text-[10px] font-bold tracking-widest">
+                    <i data-lucide="credit-card" class="w-3 h-3"></i>
+                    <span>Rekening Tujuan Iuran</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <p class="text-[10px] opacity-60">Bank</p>
+                        <p class="font-bold text-sm">BCA (Bank Central Asia)</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] opacity-60">Nomor Rekening</p>
+                        <p class="font-bold text-lg tracking-wider">8810 2231 45</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] opacity-60">Atas Nama</p>
+                        <p class="font-bold text-sm uppercase">Bendahara Eternity</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="grid grid-cols-2 md:flex md:items-center gap-2">
+            <button onclick="exportToExcel()" class="flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl transition text-sm font-bold shadow-sm">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                <span>Ekspor Excel</span>
+            </button>
+            <div id="adminActions" class="hidden contents md:flex md:space-x-2">
+                <button onclick="openModal('modalKas')" class="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl transition text-sm font-bold shadow-sm">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Tambah Kas</span>
+                </button>
+                <button onclick="openModal('modalWarga')" class="flex items-center justify-center space-x-2 bg-white border border-slate-200 text-slate-700 p-3 rounded-xl transition text-sm font-bold shadow-sm col-span-2">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>Data Warga</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabel Transaksi -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="font-bold text-slate-800 text-sm">Riwayat Buku Besar</h3>
+                <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold">LIVE</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[600px] md:min-w-full">
+                    <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-widest border-b border-slate-200">
+                        <tr>
+                            <th class="px-4 py-3">Tanggal</th>
+                            <th class="px-4 py-3">Keterangan</th>
+                            <th class="px-4 py-3 text-right">Debit (D)</th>
+                            <th class="px-4 py-3 text-right">Kredit (K)</th>
+                            <th id="colAction" class="hidden px-4 py-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100 text-[13px]"></tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="hidden p-10 text-center text-slate-400">
+                <i data-lucide="inbox" class="mx-auto w-8 h-8 mb-2 opacity-20"></i>
+                <p class="text-sm">Belum ada transaksi</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Login -->
+    <div id="modalLogin" class="modal fixed inset-0 flex items-center justify-center opacity-0 pointer-events-none z-[100] p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-sm rounded-3xl shadow-2xl z-50 overflow-hidden">
+            <div class="p-6 text-center">
+                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="lock" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-1">Akses Pengurus</h3>
+                <input type="password" id="adminPassword" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-center mb-4 tracking-widest" placeholder="••••••••">
+                <button onclick="processLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg">Masuk</button>
+                <button onclick="closeModal('modalLogin')" class="w-full text-slate-400 text-xs py-3 mt-2">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Kas -->
+    <div id="modalKas" class="modal fixed inset-0 flex items-end md:items-center justify-center opacity-0 pointer-events-none z-[100]">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-md rounded-t-[2rem] md:rounded-3xl shadow-2xl z-50 overflow-hidden">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">Transaksi Baru</h3>
+                    <button onclick="closeModal('modalKas')"><i data-lucide="x" class="text-slate-400"></i></button>
+                </div>
+                <form id="formKas" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="relative">
+                            <input type="radio" name="kasJenis" value="debit" checked class="peer sr-only">
+                            <div class="p-2 text-center border rounded-xl peer-checked:bg-emerald-50 peer-checked:border-emerald-500 text-sm">Debit</div>
+                        </label>
+                        <label class="relative">
+                            <input type="radio" name="kasJenis" value="kredit" class="peer sr-only">
+                            <div class="p-2 text-center border rounded-xl peer-checked:bg-rose-50 peer-checked:border-rose-500 text-sm">Kredit</div>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="date" id="kasTanggal" required class="w-full px-4 py-2 bg-slate-50 border rounded-xl text-sm">
+                        <input type="text" id="kasNominalDisplay" required class="w-full px-4 py-2 bg-slate-50 border rounded-xl text-sm" placeholder="Nominal">
+                        <input type="hidden" id="kasNominal">
+                    </div>
+                    <select id="kasWargaId" class="w-full px-4 py-2 bg-slate-50 border rounded-xl text-sm"></select>
+                    <input type="text" id="kasKeterangan" required class="w-full px-4 py-2 bg-slate-50 border rounded-xl text-sm" placeholder="Keterangan">
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg">Simpan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Warga -->
+    <div id="modalWarga" class="modal fixed inset-0 flex items-end md:items-center justify-center opacity-0 pointer-events-none z-[100]">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+        <div class="modal-container bg-white w-full max-w-lg rounded-t-[2rem] md:rounded-3xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh]">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-lg font-bold">Data Warga</h3>
+                <button onclick="closeModal('modalWarga')"><i data-lucide="x" class="text-slate-400"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <form id="formWarga" class="mb-6 flex gap-2">
+                    <input type="text" id="wargaNama" placeholder="Nama" required class="flex-1 px-4 py-2 border rounded-xl text-sm">
+                    <input type="text" id="wargaBlok" placeholder="Blok" required class="w-24 px-4 py-2 border rounded-xl text-sm uppercase">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm">Tambah</button>
+                </form>
+                <div class="space-y-2" id="listWargaMobile"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let dataKas = JSON.parse(localStorage.getItem('eternity_kas')) || [];
+        let dataWarga = JSON.parse(localStorage.getItem('eternity_warga')) || [];
+        let isAdmin = false;
+        let myChart = null;
+        const ADMIN_PWD = "eternityadmin";
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            renderAll();
+            setupCurrencyInput();
+            document.getElementById('kasTanggal').valueAsDate = new Date();
+        });
+
+        function setupCurrencyInput() {
+            const display = document.getElementById('kasNominalDisplay');
+            const hidden = document.getElementById('kasNominal');
+            display.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/[^0-9]/g, '');
+                hidden.value = val;
+                e.target.value = val ? new Intl.NumberFormat('id-ID').format(val) : '';
+            });
+        }
+
+        function toggleLogin() {
+            if (isAdmin) { isAdmin = false; updateAuthUI(); } 
+            else { openModal('modalLogin'); }
+        }
+
+        function processLogin() {
+            if (document.getElementById('adminPassword').value === ADMIN_PWD) {
+                isAdmin = true;
+                document.getElementById('adminPassword').value = '';
+                closeModal('modalLogin');
+                updateAuthUI();
+            } else { alert('Sandi Salah!'); }
+        }
+
+        function updateAuthUI() {
+            document.getElementById('adminBadge').classList.toggle('hidden', !isAdmin);
+            document.getElementById('adminActions').classList.toggle('hidden', !isAdmin);
+            document.getElementById('colAction').classList.toggle('hidden', !isAdmin);
+            document.getElementById('loginBtnText').innerText = isAdmin ? 'Logout' : 'Login Admin';
+            renderAll();
+        }
+
+        function formatIDR(n) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+        }
+
+        // FUNGSI GRAFIK
+        function updateChart() {
+            const ctx = document.getElementById('kasChart').getContext('2d');
+            
+            // Generate label 3 bulan terakhir
+            const labels = [];
+            const debitData = [];
+            const kreditData = [];
+            
+            const now = new Date();
+            for (let i = 2; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthName = d.toLocaleString('id-ID', { month: 'short' });
+                labels.push(monthName);
+                
+                // Filter data per bulan
+                const monthData = dataKas.filter(item => {
+                    const itemDate = new Date(item.tanggal);
+                    return itemDate.getMonth() === d.getMonth() && itemDate.getFullYear() === d.getFullYear();
+                });
+                
+                const dSum = monthData.reduce((a, c) => a + (c.jenis === 'debit' ? c.nominal : 0), 0);
+                const kSum = monthData.reduce((a, c) => a + (c.jenis === 'kredit' ? c.nominal : 0), 0);
+                
+                debitData.push(dSum);
+                kreditData.push(kSum);
+            }
+
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Masuk (D)',
+                            data: debitData,
+                            backgroundColor: '#10b981',
+                            borderRadius: 6,
+                        },
+                        {
+                            label: 'Keluar (K)',
+                            data: kreditData,
+                            backgroundColor: '#f43f5e',
+                            borderRadius: 6,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 9 } } },
+                        x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } }
+                    }
+                }
+            });
+        }
+
+        function renderAll() {
+            const totals = dataKas.reduce((a, c) => {
+                if (c.jenis === 'debit') a.d += parseFloat(c.nominal);
+                else a.k += parseFloat(c.nominal);
+                return a;
+            }, { d: 0, k: 0 });
+
+            document.getElementById('totalSaldo').innerText = formatIDR(totals.d - totals.k);
+            document.getElementById('totalDebit').innerText = formatIDR(totals.d);
+            document.getElementById('totalKredit').innerText = formatIDR(totals.k);
+
+            // Tabel
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            document.getElementById('emptyState').classList.toggle('hidden', dataKas.length > 0);
+            
+            [...dataKas].sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal)).forEach(item => {
+                const warga = dataWarga.find(w => w.id === item.wargaId);
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-50 hover:bg-slate-50/50';
+                row.innerHTML = `
+                    <td class="px-4 py-3 text-slate-400 font-mono text-[10px]">${item.tanggal}</td>
+                    <td class="px-4 py-3">
+                        <div class="font-bold text-slate-700">${item.keterangan}</div>
+                        <div class="text-[10px] text-blue-600">${warga ? warga.nama + ' (' + warga.blok + ')' : 'Umum'}</div>
+                    </td>
+                    <td class="px-4 py-3 text-right text-emerald-600 font-bold">${item.jenis === 'debit' ? formatIDR(item.nominal) : '-'}</td>
+                    <td class="px-4 py-3 text-right text-rose-600 font-bold">${item.jenis === 'kredit' ? formatIDR(item.nominal) : '-'}</td>
+                    ${isAdmin ? `<td class="px-4 py-3 text-center">
+                        <button onclick="deleteKas('${item.id}')" class="text-rose-300 hover:text-rose-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>` : ''}
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Warga List
+            const wargaList = document.getElementById('listWargaMobile');
+            const wargaSelect = document.getElementById('kasWargaId');
+            wargaList.innerHTML = '';
+            wargaSelect.innerHTML = '<option value="">-- Umum / Pengeluaran --</option>';
+            dataWarga.sort((a,b)=>a.nama.localeCompare(b.nama)).forEach(w => {
+                wargaSelect.innerHTML += `<option value="${w.id}">${w.nama} (${w.blok})</option>`;
+                wargaList.innerHTML += `
+                    <div class="flex justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <div class="text-sm font-bold">${w.nama} <span class="text-[10px] text-slate-400 font-normal">| ${w.blok}</span></div>
+                        ${isAdmin ? `<button onclick="deleteWarga('${w.id}')" class="text-rose-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+                    </div>`;
+            });
+            
+            updateChart();
+            lucide.createIcons();
+        }
+
+        document.getElementById('formKas').addEventListener('submit', (e) => {
+            e.preventDefault();
+            dataKas.push({
+                id: Date.now().toString(),
+                jenis: document.querySelector('input[name="kasJenis"]:checked').value,
+                tanggal: document.getElementById('kasTanggal').value,
+                nominal: parseFloat(document.getElementById('kasNominal').value),
+                wargaId: document.getElementById('kasWargaId').value,
+                keterangan: document.getElementById('kasKeterangan').value
+            });
+            localStorage.setItem('eternity_kas', JSON.stringify(dataKas));
+            closeModal('modalKas');
+            renderAll();
+            e.target.reset();
+            document.getElementById('kasNominalDisplay').value = '';
+        });
+
+        document.getElementById('formWarga').addEventListener('submit', (e) => {
+            e.preventDefault();
+            dataWarga.push({ id: Date.now().toString(), nama: document.getElementById('wargaNama').value, blok: document.getElementById('wargaBlok').value });
+            localStorage.setItem('eternity_warga', JSON.stringify(dataWarga));
+            renderAll();
+            e.target.reset();
+        });
+
+        function deleteKas(id) { if(confirm('Hapus?')) { dataKas = dataKas.filter(i=>i.id!==id); localStorage.setItem('eternity_kas', JSON.stringify(dataKas)); renderAll(); } }
+        function deleteWarga(id) { if(confirm('Hapus warga?')) { dataWarga = dataWarga.filter(i=>i.id!==id); localStorage.setItem('eternity_warga', JSON.stringify(dataWarga)); renderAll(); } }
+        function openModal(id) { document.getElementById(id).classList.remove('opacity-0', 'pointer-events-none'); }
+        function closeModal(id) { document.getElementById(id).classList.add('opacity-0', 'pointer-events-none'); }
+
+        function exportToExcel() {
+            const ws = XLSX.utils.aoa_to_sheet([
+                ["LAPORAN KAS CLUSTER ETERNITY"],
+                ["Tanggal:", new Date().toLocaleDateString()],
+                [],
+                ["No", "Tanggal", "Keterangan", "Warga", "Debit", "Kredit"]
+            ]);
+            const body = dataKas.map((item, i) => {
+                const w = dataWarga.find(x=>x.id===item.wargaId);
+                return [i+1, item.tanggal, item.keterangan, w?w.nama:'Umum', item.jenis==='debit'?item.nominal:0, item.jenis==='kredit'?item.nominal:0];
+            });
+            XLSX.utils.sheet_add_aoa(ws, body, {origin: "A5"});
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Kas");
+            XLSX.writeFile(wb, "Laporan_Kas_Eternity.xlsx");
+        }
+    </script>
+</body>
+</html>
